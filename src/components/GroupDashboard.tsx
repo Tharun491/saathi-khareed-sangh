@@ -6,7 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTranslation } from "@/hooks/useTranslation";
-import { ArrowLeft, Users, Package, Clock, Calculator, IndianRupee } from "lucide-react";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import Invoice from "@/components/Invoice";
+import { ArrowLeft, Users, Package, Clock, Calculator, IndianRupee, FileText } from "lucide-react";
 
 interface GroupDashboardProps {
   onBack: () => void;
@@ -25,6 +27,7 @@ export default function GroupDashboard({ onBack, vendorData }: GroupDashboardPro
   const [groupVendors, setGroupVendors] = useState<any[]>([]);
   const [orders, setOrders] = useState<{ [vendorId: string]: OrderItem[] }>({});
   const [deliveryTime, setDeliveryTime] = useState('');
+  const [showInvoice, setShowInvoice] = useState(false);
 
   useEffect(() => {
     // Load group vendors from localStorage
@@ -93,17 +96,49 @@ export default function GroupDashboard({ onBack, vendorData }: GroupDashboardPro
     '6:00 PM - 8:00 PM'
   ];
 
+  const handlePlaceOrder = () => {
+    // Validate that we have orders and delivery time
+    const currentOrders = orders[vendorData.id] || [];
+    if (currentOrders.length === 0) {
+      alert('Please add items to your order before placing it.');
+      return;
+    }
+    if (!deliveryTime) {
+      alert('Please select a delivery time before placing your order.');
+      return;
+    }
+    
+    // Show invoice
+    setShowInvoice(true);
+    
+    // Save order to localStorage for persistence
+    const orderData = {
+      orderId: `ORD-${Date.now()}`,
+      vendorId: vendorData.id,
+      items: currentOrders,
+      deliveryTime,
+      timestamp: new Date().toISOString(),
+      groupCode: vendorData.groupCode
+    };
+    
+    const existingOrders = JSON.parse(localStorage.getItem('placedOrders') || '[]');
+    existingOrders.push(orderData);
+    localStorage.setItem('placedOrders', JSON.stringify(existingOrders));
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
       <div className="container mx-auto max-w-4xl">
-        <Button 
-          onClick={onBack}
-          variant="ghost" 
-          className="mb-6"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          {t('back')}
-        </Button>
+        <div className="flex items-center justify-between mb-6">
+          <Button 
+            onClick={onBack}
+            variant="ghost"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            {t('back')}
+          </Button>
+          <ThemeSwitcher />
+        </div>
 
         <div className="grid gap-6">
           {/* Group Info */}
@@ -277,13 +312,22 @@ export default function GroupDashboard({ onBack, vendorData }: GroupDashboardPro
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex items-end">
+                <div className="flex items-end gap-2">
                   <Button 
                     onClick={() => alert('Delivery time confirmed and suppliers notified!')}
                     disabled={!deliveryTime}
-                    className="w-full"
+                    variant="outline"
+                    className="flex-1"
                   >
                     {t('confirm')} Delivery
+                  </Button>
+                  <Button 
+                    onClick={handlePlaceOrder}
+                    disabled={!deliveryTime || (orders[vendorData.id]?.length || 0) === 0}
+                    className="flex-1"
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    Place Order & Get Invoice
                   </Button>
                 </div>
               </div>
@@ -291,6 +335,17 @@ export default function GroupDashboard({ onBack, vendorData }: GroupDashboardPro
           </Card>
         </div>
       </div>
+      
+      {/* Invoice Modal */}
+      {showInvoice && (
+        <Invoice
+          orders={orders[vendorData.id] || []}
+          vendorData={vendorData}
+          groupVendors={groupVendors}
+          deliveryTime={deliveryTime}
+          onClose={() => setShowInvoice(false)}
+        />
+      )}
     </div>
   );
 }
